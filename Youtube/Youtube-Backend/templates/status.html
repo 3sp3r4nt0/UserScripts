@@ -1,0 +1,43 @@
+<!-- templates/status.html -->
+{% extends "base.html" %}
+
+{% block title %}History - YouTube Downloader{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📜 Download History</h1>
+    <p>View your past downloads and manage duplicates</p>
+</div>
+
+<section class="card">
+    <div class="section-header">
+        <h2>All Downloads ({{ history|length }})</h2>
+        <form method="POST" action="{{ url_for('clear_history') }}" 
+              onsubmit="return confirm('Are you sure you want to clear all history?');">
+            <button type="submit" class="btn btn-danger">Clear History</button>
+        </form>
+    </div>
+    
+    <div class="history-list">
+        {% if history %}
+            {% for item in history|reverse %}
+            <div class="history-item">
+                <div class="history-info">
+                    <span class="history-title">{{ item.title or 'Unknown Title' }}</span>
+                    <span class="history-url">{{ item.url[:60] }}{% if item.url|length > 60 %}...{% endif %}</span>
+                </div>
+                <div class="history-meta">
+                    <span class="history-date">{{ item.downloaded_at[:10] if item.downloaded_at else 'Unknown' }}</span>
+                    {% if item.source == 'scan' %}
+                    <span class="history-badge">Scanned</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="no-history">No download history yet</p>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

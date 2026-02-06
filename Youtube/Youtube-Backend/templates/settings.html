@@ -1,0 +1,125 @@
+<!-- templates/settings.html -->
+{% extends "base.html" %}
+
+{% block title %}Settings - YouTube Downloader{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>⚙️ Settings</h1>
+    <p>Configure download preferences and filters</p>
+</div>
+
+<form method="POST" action="{{ url_for('settings') }}">
+    <section class="card">
+        <h2>📁 Download Settings</h2>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="default_format">Default Format</label>
+                <select id="default_format" name="default_format">
+                    <option value="mp4" {% if settings.default_format == 'mp4' %}selected{% endif %}>MP4 (Video)</option>
+                    <option value="mp3" {% if settings.default_format == 'mp3' %}selected{% endif %}>MP3 (Audio)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="video_quality">Video Quality</label>
+                <select id="video_quality" name="video_quality">
+                    <option value="best" {% if settings.video_quality == 'best' %}selected{% endif %}>Best Available</option>
+                    <option value="1080p" {% if settings.video_quality == '1080p' %}selected{% endif %}>1080p</option>
+                    <option value="720p" {% if settings.video_quality == '720p' %}selected{% endif %}>720p</option>
+                    <option value="480p" {% if settings.video_quality == '480p' %}selected{% endif %}>480p</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="audio_quality">Audio Quality (kbps)</label>
+                <select id="audio_quality" name="audio_quality">
+                    <option value="320" {% if settings.audio_quality == '320' %}selected{% endif %}>320 kbps</option>
+                    <option value="256" {% if settings.audio_quality == '256' %}selected{% endif %}>256 kbps</option>
+                    <option value="192" {% if settings.audio_quality == '192' %}selected{% endif %}>192 kbps</option>
+                    <option value="128" {% if settings.audio_quality == '128' %}selected{% endif %}>128 kbps</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="max_threads">Maximum Concurrent Downloads</label>
+            <input type="number" id="max_threads" name="max_threads" 
+                   value="{{ settings.max_threads }}" min="1" max="10">
+        </div>
+    </section>
+    
+    <section class="card">
+        <h2>⏱️ Duration Filters</h2>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="min_video_length">Minimum Length (seconds)</label>
+                <input type="number" id="min_video_length" name="min_video_length" 
+                       value="{{ settings.min_video_length }}" min="0">
+                <small>Videos shorter than this will be skipped</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="max_video_length">Maximum Length (seconds)</label>
+                <input type="number" id="max_video_length" name="max_video_length" 
+                       value="{{ settings.max_video_length }}" min="0">
+                <small>Videos longer than this will be skipped (3600 = 1 hour)</small>
+            </div>
+        </div>
+    </section>
+    
+    <section class="card">
+        <h2>🚫 Title Exclusion Filters</h2>
+        
+        <div class="form-group">
+            <label for="exclude_keywords">Exclude Keywords (comma-separated)</label>
+            <input type="text" id="exclude_keywords" name="exclude_keywords" 
+                   value="{{ settings.exclude_keywords|join(', ') }}"
+                   placeholder="Instrum, Instrumental, Karaoke">
+            <small>Videos with these words in the title will be skipped</small>
+        </div>
+    </section>
+    
+    <section class="card">
+        <h2>📋 Metadata Options</h2>
+        
+        <div class="form-group checkbox-group">
+            <label>
+                <input type="checkbox" name="extract_metadata" 
+                       {% if settings.extract_metadata %}checked{% endif %}>
+                Extract and save metadata (info.json files)
+            </label>
+        </div>
+        
+        <div class="form-group checkbox-group">
+            <label>
+                <input type="checkbox" name="embed_thumbnail" 
+                       {% if settings.embed_thumbnail %}checked{% endif %}>
+                Embed thumbnails in audio files
+            </label>
+        </div>
+        
+        <div class="form-group checkbox-group">
+            <label>
+                <input type="checkbox" name="download_subtitles" 
+                       {% if settings.download_subtitles %}checked{% endif %}>
+                Download subtitles (when available)
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <label for="preferred_subtitle_lang">Preferred Subtitle Language</label>
+            <input type="text" id="preferred_subtitle_lang" name="preferred_subtitle_lang" 
+                   value="{{ settings.preferred_subtitle_lang }}" placeholder="en">
+        </div>
+    </section>
+    
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary btn-large">Save Settings</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary btn-large">Cancel</a>
+    </div>
+</form>
+
+{% endblock %}

@@ -1,0 +1,291 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block title %}Home - YouTube Downloader{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📥 Download Videos</h1>
+    <p>Download videos from YouTube and 1000+ other sites</p>
+</div>
+
+<!-- Quick Download Section -->
+<section class="card">
+    <h2>🚀 Quick Download</h2>
+    <form id="quick-download-form" class="download-form">
+        <div class="form-group">
+            <label for="url">Video/Playlist URL</label>
+            <input type="url" id="url" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="format">Format</label>
+                <select id="format" name="format">
+                    <option value="mp4" {% if settings.default_format == 'mp4' %}selected{% endif %}>MP4 (Video)</option>
+                    <option value="mp3" {% if settings.default_format == 'mp3' %}selected{% endif %}>MP3 (Audio)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    <span class="btn-text">Download</span>
+                    <span class="btn-loading" style="display: none;">Downloading...</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<!-- Batch Download Section -->
+<section class="card">
+    <h2>📦 Batch Download</h2>
+    <form id="batch-download-form" class="download-form">
+        <div class="form-group">
+            <label for="batch-urls">URLs (one per line)</label>
+            <textarea id="batch-urls" name="urls" rows="5" placeholder="https://www.youtube.com/watch?v=...
+https://www.youtube.com/watch?v=...
+https://vimeo.com/..."></textarea>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label for="job-name">Job Name</label>
+                <input type="text" id="job-name" name="name" placeholder="My Download Job">
+            </div>
+            <div class="form-group">
+                <label for="batch-format">Format</label>
+                <select id="batch-format" name="format">
+                    <option value="mp4">MP4 (Video)</option>
+                    <option value="mp3">MP3 (Audio)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Start Batch</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<!-- URL Info Preview -->
+<section class="card" id="url-preview" style="display: none;">
+    <h2>📋 Video Information</h2>
+    <div class="video-preview">
+        <img id="preview-thumbnail" src="" alt="Thumbnail" class="preview-thumb">
+        <div class="preview-info">
+            <h3 id="preview-title"></h3>
+            <p id="preview-uploader"></p>
+            <p id="preview-duration"></p>
+            <p id="preview-views"></p>
+            <p id="preview-playlist"></p>
+        </div>
+    </div>
+</section>
+
+<!-- Active Downloads -->
+<section class="card">
+    <h2>⬇️ Active Downloads</h2>
+    <div id="active-downloads">
+        <p class="no-downloads">No active downloads</p>
+    </div>
+</section>
+
+<!-- Recent Downloads -->
+{% if recent_downloads %}
+<section class="card">
+    <h2>📜 Recent Downloads</h2>
+    <div class="history-list">
+        {% for item in recent_downloads|reverse %}
+        <div class="history-item">
+            <span class="history-title">{{ item.title or 'Unknown' }}</span>
+            <span class="history-date">{{ item.downloaded_at[:10] if item.downloaded_at else 'Unknown' }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize socket connection
+    const socket = io();
+    
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+    
+    // URL preview on input
+    let previewTimeout;
+    document.getElementById('url').addEventListener('input', function() {
+        clearTimeout(previewTimeout);
+        const url = this.value.trim();
+        
+        if (url) {
+            previewTimeout = setTimeout(() => fetchUrlInfo(url), 500);
+        } else {
+            document.getElementById('url-preview').style.display = 'none';
+        }
+    });
+    
+    async function fetchUrlInfo(url) {
+        try {
+            const response = await fetch('/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            
+            const data = await response.json();
+            if (data.status === 'success') {
+                showPreview(data.info);
+            }
+        } catch (error) {
+            console.error('Error fetching URL info:', error);
+        }
+    }
+    
+    function showPreview(info) {
+        const preview = document.getElementById('url-preview');
+        document.getElementById('preview-thumbnail').src = info.thumbnail || '';
+        document.getElementById('preview-title').textContent = info.title;
+        document.getElementById('preview-uploader').textContent = 'By: ' + info.uploader;
+        document.getElementById('preview-duration').textContent = 'Duration: ' + formatDuration(info.duration);
+        document.getElementById('preview-views').textContent = 'Views: ' + (info.view_count || 0).toLocaleString();
+        document.getElementById('preview-playlist').textContent = info.is_playlist ? 
+            `Playlist: ${info.playlist_count} videos` : '';
+        preview.style.display = 'block';
+    }
+    
+    function formatDuration(seconds) {
+        if (!seconds) return 'Unknown';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+    
+    // Quick download form
+    document.getElementById('quick-download-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const url = formData.get('url');
+        const format = formData.get('format');
+        
+        const btn = this.querySelector('button');
+        btn.disabled = true;
+        btn.querySelector('.btn-text').style.display = 'none';
+        btn.querySelector('.btn-loading').style.display = 'inline';
+        
+        try {
+            const response = await fetch('/download', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            if (data.status === 'started') {
+                addActiveDownload(data.download_id, url);
+                this.reset();
+                document.getElementById('url-preview').style.display = 'none';
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            alert('Error starting download: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.querySelector('.btn-text').style.display = 'inline';
+            btn.querySelector('.btn-loading').style.display = 'none';
+        }
+    });
+    
+    // Batch download form
+    document.getElementById('batch-download-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const urls = document.getElementById('batch-urls').value
+            .split('\n')
+            .map(u => u.trim())
+            .filter(u => u);
+        
+        if (urls.length === 0) {
+            alert('Please enter at least one URL');
+            return;
+        }
+        
+        const data = {
+            urls: urls,
+            format: document.getElementById('batch-format').value,
+            name: document.getElementById('job-name').value || 'Batch Download'
+        };
+        
+        try {
+            const response = await fetch('/download/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            if (result.status === 'started') {
+                alert(`Batch download started! Job ID: ${result.job_id}`);
+                this.reset();
+                window.location.href = '/jobs';
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error starting batch download: ' + error.message);
+        }
+    });
+    
+    // Active downloads tracking
+    const activeDownloads = {};
+    
+    function addActiveDownload(id, url) {
+        const container = document.getElementById('active-downloads');
+        container.querySelector('.no-downloads')?.remove();
+        
+        const div = document.createElement('div');
+        div.className = 'download-item';
+        div.id = `download-${id}`;
+        div.innerHTML = `
+            <div class="download-info">
+                <span class="download-title">Loading...</span>
+                <span class="download-status">Starting...</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="download-stats">
+                <span class="download-speed"></span>
+                <span class="download-eta"></span>
+            </div>
+        `;
+        container.appendChild(div);
+        activeDownloads[id] = div;
+    }
+    
+    // Socket events for progress updates
+    socket.on('download_progress', function(data) {
+        const div = document.getElementById(`download-${data.id}`);
+        if (div) {
+            div.querySelector('.download-title').textContent = data.title;
+            div.querySelector('.download-status').textContent = data.status;
+            div.querySelector('.progress-fill').style.width = data.progress + '%';
+            div.querySelector('.download-speed').textContent = data.speed;
+            div.querySelector('.download-eta').textContent = data.eta ? `ETA: ${data.eta}` : '';
+            
+            if (data.status === 'completed' || data.status === 'error' || data.status === 'skipped') {
+                div.classList.add(`status-${data.status}`);
+                if (data.error) {
+                    div.querySelector('.download-status').textContent = `${data.status}: ${data.error}`;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
